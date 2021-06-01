@@ -1,0 +1,106 @@
+---
+title: "EnergyCenter"
+author: "Revant Kantamneni"
+date: "2/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(ggplot2)
+```
+
+Pre Covid and During Covid Bar Charts Across Income Brackets
+```{r}
+graphs2 <- function(start_date, end_date){
+
+setwd("/Users/revantkantamneni/Documents/Stats230/EnergyCenter")
+report <- read.csv("report.csv")
+report <- data.frame(report)
+income <- read.csv("ct_income.csv")
+
+#Filter By Date
+start_date <- as.Date(start_date, "%m/%d/%y")
+end_date <- as.Date(end_date, "%m/%d/%y")
+
+report$Approved.Date <- as.Date(report$Approved.Date, "%m/%d/%y")
+report <- report[(report$Approved.Date >= start_date) & (report$Approved.Date <= end_date),]
+
+income$Towns <- as.character(income$Towns)
+report$Municipality <- as.character(report$Municipality)
+
+income$Median.household.income <- as.factor(gsub(",", "", income$Median.household.income))
+income$Median.household.income <- as.integer(gsub("", "", income$Median.household.income))
+
+
+
+library(tidyverse)
+colnames(income)[1] <- "Municipality"
+
+report <- left_join(report, income)
+
+report$Approved.Year <- substr(report$Approved.Date, 1 , 4)
+
+library(ggplot2)
+#20000 - 44,999
+tier1 <- report[report$Median.household.income>20000 & report$Median.household.income<44999, ]
+mainPlot <- data.frame( table(tier1$Approved.Year))
+colnames(mainPlot) <- c("Year", "Installations")
+mainPlot$Tier <- "Tier 1: $20,000-$44,999"
+
+#45000 - 139999
+tier2 <- report[report$Median.household.income>45000 & report$Median.household.income<139999, ]
+mainPlot2 <- data.frame( table(tier2$Approved.Year))
+colnames(mainPlot2) <- c("Year", "Installations")
+mainPlot2$Tier <- "Tier 2: $45,000-$139,999"
+mainPlot <- rbind(mainPlot, mainPlot2)
+
+#140000 - 149000
+tier3 <- report[report$Median.household.income>140000 & report$Median.household.income<149000, ]
+mainPlot3 <- data.frame( table(tier3$Approved.Year))
+colnames(mainPlot3) <- c("Year", "Installations")
+mainPlot3$Tier <- "Tier 3: $140,000-$149,000"
+mainPlot <- rbind(mainPlot, mainPlot3)
+
+#150000 - 199999
+tier4 <- report[report$Median.household.income>150000 & report$Median.household.income<199999, ]
+mainPlot4 <- data.frame( table(tier4$Approved.Year))
+colnames(mainPlot4) <- c("Year", "Installations")
+mainPlot4$Tier <- "Tier 4: $150,000-$199,999"
+mainPlot <- rbind(mainPlot, mainPlot4)
+
+#200000
+tier5 <- report[report$Median.household.income>200000,]
+mainPlot5 <- data.frame( table(tier5$Approved.Year))
+colnames(mainPlot5) <- c("Year", "Installations")
+mainPlot5$Tier <- "Tier 5: $200,000+"
+mainPlot <- rbind(mainPlot, mainPlot5)
+
+print(start_date)
+
+ggplot(data=mainPlot, aes(x=Year, y=log(Installations), fill=Tier)) +
+  geom_bar(stat="identity", position=position_dodge()) + scale_fill_brewer(palette="Blues") +
+  labs(x="Year", y="Log Number of Solar Installations") + ggtitle("Solar Installations Based On Median Household Income: Pre COVID and During COVID") + scale_x_discrete(labels=c("2019" = "Pre COVID (2019)", "2020" = "During COVID (2020)"))
+  
+ggsave(paste("hist_", start_date,"-", end_date, ".png"), width = 9, height = 6, dpi = 120)
+
+}
+
+graphs2("1/1/19", "12/31/20")
+
+
+```
+
+
+
+
+
+
+
+
+
+

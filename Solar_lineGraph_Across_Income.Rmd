@@ -1,0 +1,159 @@
+---
+title: "EnergyCenter"
+author: "Revant Kantamneni"
+date: "2/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+generateReport <- function(start_date, end_date){
+
+setwd("/Users/revantkantamneni/Documents/Stats230/EnergyCenter")
+report <- read.csv("report.csv")
+report <- data.frame(report)
+income <- read.csv("ct_income.csv")
+
+#Filter By Date
+start_date <- as.Date(start_date, "%m/%d/%y")
+end_date <- as.Date(end_date, "%m/%d/%y")
+
+report$Approved.Date <- as.Date(report$Approved.Date, "%m/%d/%y")
+report <- report[(report$Approved.Date >= start_date) & (report$Approved.Date <= end_date),]
+
+
+#Data Clean
+report <- subset(report, report$City != "brendaliz.2873@gmail.com")
+report <- report[!(report$Municipality==""), ]
+
+
+table1 <- sort(table(report$Municipality), decreasing = TRUE)
+finalReport <- as.data.frame(table1)
+names(finalReport)[1:2] <- c("Municipality","Number of Installations")
+
+income$Towns <- as.character(income$Towns)
+finalReport$Municipality <- as.character(finalReport$Municipality)
+
+
+report$Incentive.Amount <- as.factor(gsub(",", "", report$Incentive.Amount))
+report$Incentive.Amount <- as.numeric(gsub("\\$", "", report$Incentive.Amount))
+finalReport[, "Average_Incentive_Amount"] <- NA
+
+report$Total.System.Cost <- as.factor(gsub(",", "", report$Total.System.Cost))
+report$Total.System.Cost <- as.numeric(gsub("\\$", "", report$Total.System.Cost))
+finalReport[, "Average_Total_System_Cost"] <- NA
+
+income$Median.household.income <- as.factor(gsub(",", "", income$Median.household.income))
+income$Median.household.income <- as.numeric(gsub("", "", income$Median.household.income))
+finalReport[, "Median_Household_Income"] <- NA
+
+
+for (x in report$Municipality) {
+  finalReport$Average_Incentive_Amount[finalReport$Municipality==x] <- round(mean(report$Incentive.Amount[report$Municipality==x]), digits = 2)
+  finalReport$Average_Total_System_Cost[finalReport$Municipality==x] <- round(mean(report$Total.System.Cost[report$Municipality==x]), digits = 2)
+  finalReport$Median_Household_Income[finalReport$Municipality==x] <- income$Median.household.income[income$Towns==x]
+}
+
+
+#Output CSV (Change path to for you specific computer)
+#write.csv(finalReport,paste0("/Users/revantkantamneni/Documents/Stats230/EnergyCenter/", start_date, "-", end_date,"_data.csv"), row.names = FALSE)
+
+return(finalReport)
+
+}
+
+
+```
+
+```{r}
+
+#Input start date and then end date (Example: generateReport("01/01/20", "12/31/20"))
+finalReport <- generateReport("01/01/01", "12/31/20")
+```
+
+```{r}
+graphs <- function(start_date, end_date){
+  
+setwd("/Users/revantkantamneni/Documents/Stats230/EnergyCenter")
+report <- read.csv("report.csv")
+report <- data.frame(report)
+income <- read.csv("ct_income.csv")
+
+#Filter By Date
+start_date <- as.Date(start_date, "%m/%d/%y")
+end_date <- as.Date(end_date, "%m/%d/%y")
+
+report$Approved.Date <- as.Date(report$Approved.Date, "%m/%d/%y")
+report <- report[(report$Approved.Date >= start_date) & (report$Approved.Date <= end_date),]
+
+income$Towns <- as.character(income$Towns)
+report$Municipality <- as.character(report$Municipality)
+
+income$Median.household.income <- as.factor(gsub(",", "", income$Median.household.income))
+income$Median.household.income <- as.integer(gsub("", "", income$Median.household.income))
+
+
+
+library(tidyverse)
+colnames(income)[1] <- "Municipality"
+
+report <- left_join(report, income)
+
+report$Approved.Year <- substr(report$Approved.Date, 1 , 4)
+
+library(ggplot2)
+#20000 - 44,999
+tier1 <- report[report$Median.household.income>20000 & report$Median.household.income<44999, ]
+mainPlot <- setNames(data.frame(table(tier1$Approved.Year)),c("Year","Tier1"))
+
+values=c("red","blue","green", "orange", "purple")
+#45000 - 139999
+tier2 <- report[report$Median.household.income>45000 & report$Median.household.income<139999, ]
+mainPlot <- left_join(mainPlot, setNames(data.frame(table(tier2$Approved.Year)),c("Year","Tier2")))
+
+#140000 - 149000
+tier3 <- report[report$Median.household.income>140000 & report$Median.household.income<149000, ]
+mainPlot <- left_join(mainPlot, setNames(data.frame(table(tier3$Approved.Year)),c("Year","Tier3")))
+
+#150000 - 199999
+tier4 <- report[report$Median.household.income>150000 & report$Median.household.income<199999, ]
+mainPlot <- left_join(mainPlot, setNames(data.frame(table(tier4$Approved.Year)),c("Year","Tier4")))
+
+#200000
+tier5 <- report[report$Median.household.income>200000,]
+mainPlot <- left_join(mainPlot, setNames(data.frame(table(tier5$Approved.Year)),c("Year","Tier5")))
+
+
+
+h <- ggplot(mainPlot) +
+  geom_line(data = mainPlot, aes(y = log(Tier1), x=Year, color = "Tier 1: $20,000-$44,999", group=1)) +
+  geom_line(data = mainPlot, aes(y = log(Tier2), x=Year, color = "Tier 2: $45,000-$139,999", group=1)) +
+  geom_line(data = mainPlot, aes(y = log(Tier3), x=Year, color = "Tier 3: $140,000-$149,000", group=1)) +
+  geom_line(data = mainPlot, aes(y = log(Tier4), x=Year, color = "Tier 4: $150,000-$199,999", group=1)) +
+  geom_line(data = mainPlot, aes(y = log(Tier5), x=Year, color = "Tier 5: $200,000+", group=1)) +
+  labs(x="Year", y="Log Number of Solar Installations")+
+  scale_color_manual(name="Legend of CT Median Household Incomes", values = c("Tier 1: $20,000-$44,999"="red", "Tier 2: $45,000-$139,999"="blue", "Tier 3: $140,000-$149,000"="green", "Tier 4: $150,000-$199,999"="orange", "Tier 5: $200,000+"="purple")) + ggtitle("Solar Installations Based On Median Household Income")
+
+ggsave(paste(start_date,"-", end_date, ".png"), h, width = 10, height = 7, dpi = 120)
+return(mainPlot)
+}
+
+graphs("1/1/05", "12/31/20")
+
+
+
+
+```
+
+
+
+
+
+
+
